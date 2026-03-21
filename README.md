@@ -13,6 +13,9 @@
 > or other consequences arising from the use of this software. **You use this
 > software entirely at your own risk.**
 
+> This is an **unofficial** community plugin and is not affiliated with or
+> endorsed by SPIFFE, SPIRE, the CNCF, or GitHub.
+
 ---
 
 [日本語](#日本語)
@@ -165,6 +168,8 @@ permissions:
 ```
 
 ### 免責事項
+
+本プロジェクトは非公式のコミュニティプラグインであり、SPIFFE、SPIRE、CNCF、および GitHub とは一切関係がなく、これらによる承認を受けたものでもありません。
 
 本ソフトウェアは実験的なものであり、現状のまま（"as-is"）提供されます。
 明示または黙示を問わず、いかなる保証も行いません。
