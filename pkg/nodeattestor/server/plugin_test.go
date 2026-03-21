@@ -108,11 +108,6 @@ func (h *testTokenHelper) sign(t *testing.T, c *githuboidc.Claims) string {
 func TestAttest_Success(t *testing.T) {
 	helper := newTestTokenHelper(t)
 	plug := server.New()
-	plug.SetValidatorForTest(githuboidc.NewTokenValidatorWithKey(
-		"https://token.actions.githubusercontent.com",
-		helper.kid,
-		&helper.privateKey.PublicKey,
-	))
 
 	_, err := plug.Configure(context.Background(), &configv1.ConfigureRequest{
 		HclConfiguration: `audience = "spire-server"`,
@@ -123,6 +118,11 @@ func TestAttest_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Configure failed: %v", err)
 	}
+	plug.SetValidatorForTest(githuboidc.NewTokenValidatorWithKey(
+		"https://token.actions.githubusercontent.com",
+		helper.kid,
+		&helper.privateKey.PublicKey,
+	))
 
 	rawToken := helper.sign(t, &githuboidc.Claims{
 		Issuer:          "https://token.actions.githubusercontent.com",
@@ -186,11 +186,6 @@ func TestAttest_Success(t *testing.T) {
 func TestAttest_AllowedOwnerRejected(t *testing.T) {
 	helper := newTestTokenHelper(t)
 	plug := server.New()
-	plug.SetValidatorForTest(githuboidc.NewTokenValidatorWithKey(
-		"https://token.actions.githubusercontent.com",
-		helper.kid,
-		&helper.privateKey.PublicKey,
-	))
 
 	_, err := plug.Configure(context.Background(), &configv1.ConfigureRequest{
 		HclConfiguration: `
@@ -202,6 +197,11 @@ func TestAttest_AllowedOwnerRejected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Configure failed: %v", err)
 	}
+	plug.SetValidatorForTest(githuboidc.NewTokenValidatorWithKey(
+		"https://token.actions.githubusercontent.com",
+		helper.kid,
+		&helper.privateKey.PublicKey,
+	))
 
 	rawToken := helper.sign(t, &githuboidc.Claims{
 		Issuer:          "https://token.actions.githubusercontent.com",
