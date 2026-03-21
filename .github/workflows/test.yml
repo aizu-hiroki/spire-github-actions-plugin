@@ -117,7 +117,7 @@ jobs:
           cat /tmp/bootstrap.crt
 
       # Write agent config and start SPIRE agent
-      - name: Start SPIRE agent and verify attestation
+      - name: Start SPIRE agent
         run: |
           mkdir -p /tmp/spire-agent-data
 
@@ -152,18 +152,38 @@ jobs:
 
           spire-agent run -config /tmp/agent.conf &
 
-          # Poll until the agent SVID is available (= attestation succeeded)
+      # Wait for node attestation to complete (server-side check)
+      - name: Wait for node attestation
+        run: |
+          AGENT_ID="spiffe://example.org/spire/agent/github_actions/aizu-hiroki/spire-github-actions-plugin"
           for i in $(seq 1 20); do
-            if spire-agent api fetch x509 -socketPath /tmp/spire-agent.sock 2>/dev/null; then
-              echo "✓ Agent attested successfully and received an SVID"
+            if spire-server agent show -spiffeID "$AGENT_ID" 2>/dev/null | grep -q "$AGENT_ID"; then
+              echo "✓ Node attestation successful: $AGENT_ID"
               exit 0
             fi
-            echo "Waiting for agent attestation... ($i/20)"
-            sleep 3
+            echo "Waiting for node attestation... ($i/20)"
+            sleep 2
           done
-
-          echo "✗ Agent did not attest within the timeout"
+          echo "✗ Node attestation did not complete within timeout"
           exit 1
+
+      # Register a workload entry for the current process (uid-based selector)
+      - name: Create workload registration entry
+        run: |
+          AGENT_ID="spiffe://example.org/spire/agent/github_actions/aizu-hiroki/spire-github-actions-plugin"
+          spire-server entry create \
+            -spiffeID "spiffe://example.org/test/github-actions" \
+            -parentID "$AGENT_ID" \
+            -selector "unix:uid:$(id -u)"
+          echo "✓ Registration entry created"
+
+      # Fetch the workload X.509-SVID to verify end-to-end issuance
+      - name: Fetch workload SVID
+        run: |
+          # Allow a moment for the agent to sync the new entry
+          sleep 3
+          spire-agent api fetch x509 -socketPath /tmp/spire-agent.sock
+          echo "✓ Workload SVID issued successfully"
 
       # Dump diagnostics when something goes wrong
       - name: Dump diagnostics on failure
