@@ -174,6 +174,85 @@ func TestAttest_EmptyEnvVarsOmitted(t *testing.T) {
 	}
 }
 
+// TestAttest_AbsentEnvVarProducesNoSelector verifies that when a specific
+// GitHub Actions env var is absent, its corresponding selector is not emitted.
+func TestAttest_AbsentEnvVarProducesNoSelector(t *testing.T) {
+	fullEnv := map[string]string{
+		"GITHUB_ACTIONS":          "true",
+		"GITHUB_REPOSITORY":       "my-org/my-repo",
+		"GITHUB_REPOSITORY_OWNER": "my-org",
+		"GITHUB_WORKFLOW":         "CI",
+		"GITHUB_WORKFLOW_REF":     "my-org/my-repo/.github/workflows/ci.yml@refs/heads/main",
+		"GITHUB_JOB":              "test",
+		"GITHUB_REF":              "refs/heads/main",
+		"GITHUB_REF_TYPE":         "branch",
+		"GITHUB_SHA":              "abc123",
+		"GITHUB_HEAD_REF":         "feature/x",
+		"GITHUB_BASE_REF":         "main",
+		"GITHUB_EVENT_NAME":       "push",
+		"GITHUB_ACTOR":            "octocat",
+		"GITHUB_RUN_ID":           "1",
+		"GITHUB_RUN_NUMBER":       "2",
+		"GITHUB_RUN_ATTEMPT":      "3",
+		"GITHUB_ENVIRONMENT":      "production",
+		"RUNNER_ENVIRONMENT":      "github-hosted",
+		"RUNNER_OS":               "Linux",
+		"RUNNER_ARCH":             "X64",
+	}
+
+	tests := []struct {
+		envVar          string
+		selectorPrefix  string
+	}{
+		{"GITHUB_REPOSITORY", "repository:"},
+		{"GITHUB_REPOSITORY_OWNER", "repository_owner:"},
+		{"GITHUB_WORKFLOW", "workflow:"},
+		{"GITHUB_WORKFLOW_REF", "workflow_ref:"},
+		{"GITHUB_JOB", "job:"},
+		{"GITHUB_REF", "ref:"},
+		{"GITHUB_REF_TYPE", "ref_type:"},
+		{"GITHUB_SHA", "sha:"},
+		{"GITHUB_HEAD_REF", "head_ref:"},
+		{"GITHUB_BASE_REF", "base_ref:"},
+		{"GITHUB_EVENT_NAME", "event_name:"},
+		{"GITHUB_ACTOR", "actor:"},
+		{"GITHUB_RUN_ID", "run_id:"},
+		{"GITHUB_RUN_NUMBER", "run_number:"},
+		{"GITHUB_RUN_ATTEMPT", "run_attempt:"},
+		{"GITHUB_ENVIRONMENT", "environment:"},
+		{"RUNNER_ENVIRONMENT", "runner_environment:"},
+		{"RUNNER_OS", "runner_os:"},
+		{"RUNNER_ARCH", "runner_arch:"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.envVar, func(t *testing.T) {
+			env := make(map[string]string, len(fullEnv))
+			for k, v := range fullEnv {
+				env[k] = v
+			}
+			delete(env, tc.envVar)
+
+			plug := newTestPlugin(t, env)
+			_, err := plug.Configure(context.Background(), &configv1.ConfigureRequest{})
+			if err != nil {
+				t.Fatalf("Configure failed: %v", err)
+			}
+
+			resp, err := plug.Attest(context.Background(), &workloadattestorv1.AttestRequest{Pid: 1})
+			if err != nil {
+				t.Fatalf("Attest failed: %v", err)
+			}
+
+			for _, v := range resp.SelectorValues {
+				if len(v) >= len(tc.selectorPrefix) && v[:len(tc.selectorPrefix)] == tc.selectorPrefix {
+					t.Errorf("unexpected selector %q when %s is absent", v, tc.envVar)
+				}
+			}
+		})
+	}
+}
+
 func TestAttest_NonGitHubActionsProcess(t *testing.T) {
 	plug := newTestPlugin(t, map[string]string{
 		"HOME": "/home/user",

@@ -73,6 +73,16 @@ type testClaims struct {
 
 func (h *testTokenHelper) sign(t *testing.T, c *githuboidc.Claims) string {
 	t.Helper()
+	return h.signWithExpiry(t, c, time.Now().Add(time.Hour))
+}
+
+func (h *testTokenHelper) signExpired(t *testing.T, c *githuboidc.Claims) string {
+	t.Helper()
+	return h.signWithExpiry(t, c, time.Now().Add(-time.Hour))
+}
+
+func (h *testTokenHelper) signWithExpiry(t *testing.T, c *githuboidc.Claims, expiresAt time.Time) string {
+	t.Helper()
 
 	now := time.Now()
 	claims := testClaims{
@@ -81,7 +91,7 @@ func (h *testTokenHelper) sign(t *testing.T, c *githuboidc.Claims) string {
 			Subject:   c.Subject,
 			Audience:  jwtv4.ClaimStrings(c.Audience),
 			IssuedAt:  jwtv4.NewNumericDate(now),
-			ExpiresAt: jwtv4.NewNumericDate(now.Add(time.Hour)),
+			ExpiresAt: jwtv4.NewNumericDate(expiresAt),
 		},
 		Repository:      c.Repository,
 		RepositoryOwner: c.RepositoryOwner,
@@ -103,17 +113,34 @@ func (h *testTokenHelper) sign(t *testing.T, c *githuboidc.Claims) string {
 	return signed
 }
 
-// --- Tests ---
-
-func TestAttest_Success(t *testing.T) {
-	helper := newTestTokenHelper(t)
-	plug := server.New()
-
-	_, err := plug.Configure(context.Background(), &configv1.ConfigureRequest{
-		HclConfiguration: `audience = "spire-server"`,
-		CoreConfiguration: &configv1.CoreConfiguration{
-			TrustDomain: "example.org",
+// mustAttest is a helper that builds a stream with a single payload and calls Attest.
+func mustAttest(plug *server.Plugin, payload []byte) error {
+	stream := &fakeAttestStream{
+		requests: []*nodeattestorv1.AttestRequest{
+			{Request: &nodeattestorv1.AttestRequest_Payload{Payload: payload}},
 		},
+	}
+	return plug.Attest(stream)
+}
+
+// validClaims returns a minimal set of valid claims for tests.
+func validClaims() *githuboidc.Claims {
+	return &githuboidc.Claims{
+		Issuer:          "https://token.actions.githubusercontent.com",
+		Subject:         "repo:my-org/my-repo:ref:refs/heads/main",
+		Audience:        []string{"spire-server"},
+		Repository:      "my-org/my-repo",
+		RepositoryOwner: "my-org",
+	}
+}
+
+// configuredPlugin returns a plugin configured with the given helper's public key.
+func configuredPlugin(t *testing.T, helper *testTokenHelper, hcl string) *server.Plugin {
+	t.Helper()
+	plug := server.New()
+	_, err := plug.Configure(context.Background(), &configv1.ConfigureRequest{
+		HclConfiguration:  hcl,
+		CoreConfiguration: &configv1.CoreConfiguration{TrustDomain: "example.org"},
 	})
 	if err != nil {
 		t.Fatalf("Configure failed: %v", err)
@@ -123,6 +150,14 @@ func TestAttest_Success(t *testing.T) {
 		helper.kid,
 		&helper.privateKey.PublicKey,
 	))
+	return plug
+}
+
+// --- Tests ---
+
+func TestAttest_Success(t *testing.T) {
+	helper := newTestTokenHelper(t)
+	plug := configuredPlugin(t, helper, `audience = "spire-server"`)
 
 	rawToken := helper.sign(t, &githuboidc.Claims{
 		Issuer:          "https://token.actions.githubusercontent.com",
@@ -185,23 +220,10 @@ func TestAttest_Success(t *testing.T) {
 
 func TestAttest_AllowedOwnerRejected(t *testing.T) {
 	helper := newTestTokenHelper(t)
-	plug := server.New()
-
-	_, err := plug.Configure(context.Background(), &configv1.ConfigureRequest{
-		HclConfiguration: `
-			audience = "spire-server"
-			allowed_repository_owners = ["trusted-org"]
-		`,
-		CoreConfiguration: &configv1.CoreConfiguration{TrustDomain: "example.org"},
-	})
-	if err != nil {
-		t.Fatalf("Configure failed: %v", err)
-	}
-	plug.SetValidatorForTest(githuboidc.NewTokenValidatorWithKey(
-		"https://token.actions.githubusercontent.com",
-		helper.kid,
-		&helper.privateKey.PublicKey,
-	))
+	plug := configuredPlugin(t, helper, `
+		audience = "spire-server"
+		allowed_repository_owners = ["trusted-org"]
+	`)
 
 	rawToken := helper.sign(t, &githuboidc.Claims{
 		Issuer:          "https://token.actions.githubusercontent.com",
@@ -218,11 +240,9 @@ func TestAttest_AllowedOwnerRejected(t *testing.T) {
 		},
 	}
 
-	err = plug.Attest(stream)
-	if err == nil {
+	if err := plug.Attest(stream); err == nil {
 		t.Fatal("expected error for disallowed owner, got nil")
-	}
-	if s, ok := status.FromError(err); !ok || s.Code() != codes.PermissionDenied {
+	} else if s, ok := status.FromError(err); !ok || s.Code() != codes.PermissionDenied {
 		t.Errorf("expected PermissionDenied, got %v", err)
 	}
 }
@@ -237,6 +257,89 @@ func TestAttest_EmptyPayload(t *testing.T) {
 	err := plug.Attest(stream)
 	if err == nil {
 		t.Fatal("expected error for empty payload, got nil")
+	}
+	if s, ok := status.FromError(err); !ok || s.Code() != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestAttest_InvalidSignature(t *testing.T) {
+	helper := newTestTokenHelper(t)
+	wrongHelper := newTestTokenHelper(t) // different RSA key pair
+
+	// Validator uses helper's public key, but token is signed with wrongHelper's key.
+	plug := configuredPlugin(t, helper, `audience = "spire-server"`)
+
+	rawToken := wrongHelper.sign(t, validClaims())
+	payload, _ := json.Marshal(&githuboidc.AttestationDataWrapper{Token: rawToken})
+
+	err := mustAttest(plug, payload)
+	if err == nil {
+		t.Fatal("expected error for invalid signature, got nil")
+	}
+	if s, ok := status.FromError(err); !ok || s.Code() != codes.PermissionDenied {
+		t.Errorf("expected PermissionDenied, got %v", err)
+	}
+}
+
+func TestAttest_ExpiredToken(t *testing.T) {
+	helper := newTestTokenHelper(t)
+	plug := configuredPlugin(t, helper, `audience = "spire-server"`)
+
+	rawToken := helper.signExpired(t, validClaims())
+	payload, _ := json.Marshal(&githuboidc.AttestationDataWrapper{Token: rawToken})
+
+	err := mustAttest(plug, payload)
+	if err == nil {
+		t.Fatal("expected error for expired token, got nil")
+	}
+	if s, ok := status.FromError(err); !ok || s.Code() != codes.PermissionDenied {
+		t.Errorf("expected PermissionDenied, got %v", err)
+	}
+}
+
+func TestAttest_WrongIssuer(t *testing.T) {
+	helper := newTestTokenHelper(t)
+	plug := configuredPlugin(t, helper, `audience = "spire-server"`)
+
+	claims := validClaims()
+	claims.Issuer = "https://evil.example.com"
+	rawToken := helper.sign(t, claims)
+	payload, _ := json.Marshal(&githuboidc.AttestationDataWrapper{Token: rawToken})
+
+	err := mustAttest(plug, payload)
+	if err == nil {
+		t.Fatal("expected error for wrong issuer, got nil")
+	}
+	if s, ok := status.FromError(err); !ok || s.Code() != codes.PermissionDenied {
+		t.Errorf("expected PermissionDenied, got %v", err)
+	}
+}
+
+func TestAttest_WrongAudience(t *testing.T) {
+	helper := newTestTokenHelper(t)
+	plug := configuredPlugin(t, helper, `audience = "spire-server"`)
+
+	claims := validClaims()
+	claims.Audience = []string{"wrong-audience"}
+	rawToken := helper.sign(t, claims)
+	payload, _ := json.Marshal(&githuboidc.AttestationDataWrapper{Token: rawToken})
+
+	err := mustAttest(plug, payload)
+	if err == nil {
+		t.Fatal("expected error for wrong audience, got nil")
+	}
+	if s, ok := status.FromError(err); !ok || s.Code() != codes.PermissionDenied {
+		t.Errorf("expected PermissionDenied, got %v", err)
+	}
+}
+
+func TestAttest_InvalidJSON(t *testing.T) {
+	plug := server.New()
+
+	err := mustAttest(plug, []byte("not-valid-json{{{"))
+	if err == nil {
+		t.Fatal("expected error for invalid JSON payload, got nil")
 	}
 	if s, ok := status.FromError(err); !ok || s.Code() != codes.InvalidArgument {
 		t.Errorf("expected InvalidArgument, got %v", err)
