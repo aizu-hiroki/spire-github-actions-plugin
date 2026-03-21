@@ -39,14 +39,34 @@ type TokenResponse struct {
 	Count int    `json:"count"`
 }
 
+// AudienceClaim handles the JWT "aud" field which may be encoded as either a
+// plain string (real GitHub Actions OIDC tokens) or a JSON array (jwtv4 library
+// default when using ClaimStrings in tests).
+type AudienceClaim []string
+
+// UnmarshalJSON accepts both `"value"` and `["value"]`.
+func (a *AudienceClaim) UnmarshalJSON(b []byte) error {
+	var arr []string
+	if err := json.Unmarshal(b, &arr); err == nil {
+		*a = arr
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	*a = []string{s}
+	return nil
+}
+
 // Claims holds the parsed claims from a GitHub Actions OIDC token.
 type Claims struct {
 	// Standard JWT claims
-	Issuer   string   `json:"iss"`
-	Subject  string   `json:"sub"`
-	Audience []string `json:"aud"`
-	IssuedAt int64    `json:"iat"`
-	Expiry   int64    `json:"exp"`
+	Issuer   string        `json:"iss"`
+	Subject  string        `json:"sub"`
+	Audience AudienceClaim `json:"aud"`
+	IssuedAt int64         `json:"iat"`
+	Expiry   int64         `json:"exp"`
 
 	// GitHub Actions specific claims
 	Repository          string `json:"repository"`
