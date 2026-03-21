@@ -180,15 +180,23 @@ jobs:
       # Fetch the workload X.509-SVID to verify end-to-end issuance
       - name: Fetch workload SVID
         run: |
-          # Allow a moment for the agent to sync the new entry
-          sleep 3
-          spire-agent api fetch x509 -socketPath /tmp/spire-agent.sock
-          echo "✓ Workload SVID issued successfully"
+          for i in $(seq 1 20); do
+            if spire-agent api fetch x509 -socketPath /tmp/spire-agent.sock 2>/dev/null; then
+              echo "✓ Workload SVID issued successfully"
+              exit 0
+            fi
+            echo "Waiting for SVID sync... ($i/20)"
+            sleep 3
+          done
+          echo "✗ Workload SVID not issued within timeout"
+          exit 1
 
       # Dump diagnostics when something goes wrong
       - name: Dump diagnostics on failure
         if: failure()
         run: |
+          echo "=== Current UID ==="
+          id
           echo "=== SPIRE server health ==="
           spire-server healthcheck 2>&1 || true
           echo "=== Registered entries ==="
