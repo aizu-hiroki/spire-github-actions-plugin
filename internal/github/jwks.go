@@ -98,8 +98,17 @@ func (v *TokenValidator) ValidateToken(ctx context.Context, rawToken string, exp
 	}
 
 	// Validate audience when specified.
-	if expectedAudience != "" && claims.Audience != expectedAudience {
-		return nil, fmt.Errorf("unexpected audience %q (expected %q)", claims.Audience, expectedAudience)
+	if expectedAudience != "" {
+		found := false
+		for _, aud := range claims.Audience {
+			if aud == expectedAudience {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("unexpected audience %v (expected %q)", claims.Audience, expectedAudience)
+		}
 	}
 
 	return claims, nil

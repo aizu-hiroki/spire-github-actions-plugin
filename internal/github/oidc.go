@@ -42,11 +42,11 @@ type TokenResponse struct {
 // Claims holds the parsed claims from a GitHub Actions OIDC token.
 type Claims struct {
 	// Standard JWT claims
-	Issuer   string `json:"iss"`
-	Subject  string `json:"sub"`
-	Audience string `json:"aud"`
-	IssuedAt int64  `json:"iat"`
-	Expiry   int64  `json:"exp"`
+	Issuer   string   `json:"iss"`
+	Subject  string   `json:"sub"`
+	Audience []string `json:"aud"`
+	IssuedAt int64    `json:"iat"`
+	Expiry   int64    `json:"exp"`
 
 	// GitHub Actions specific claims
 	Repository          string `json:"repository"`

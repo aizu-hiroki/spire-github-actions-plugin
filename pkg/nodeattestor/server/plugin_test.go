@@ -79,7 +79,7 @@ func (h *testTokenHelper) sign(t *testing.T, c *githuboidc.Claims) string {
 		RegisteredClaims: jwtv4.RegisteredClaims{
 			Issuer:    c.Issuer,
 			Subject:   c.Subject,
-			Audience:  jwtv4.ClaimStrings{c.Audience},
+			Audience:  jwtv4.ClaimStrings(c.Audience),
 			IssuedAt:  jwtv4.NewNumericDate(now),
 			ExpiresAt: jwtv4.NewNumericDate(now.Add(time.Hour)),
 		},
@@ -127,7 +127,7 @@ func TestAttest_Success(t *testing.T) {
 	rawToken := helper.sign(t, &githuboidc.Claims{
 		Issuer:          "https://token.actions.githubusercontent.com",
 		Subject:         "repo:my-org/my-repo:ref:refs/heads/main",
-		Audience:        "spire-server",
+		Audience:        []string{"spire-server"},
 		Repository:      "my-org/my-repo",
 		RepositoryOwner: "my-org",
 		Workflow:        "CI",
@@ -206,7 +206,7 @@ func TestAttest_AllowedOwnerRejected(t *testing.T) {
 	rawToken := helper.sign(t, &githuboidc.Claims{
 		Issuer:          "https://token.actions.githubusercontent.com",
 		Subject:         "repo:untrusted-org/repo:ref:refs/heads/main",
-		Audience:        "spire-server",
+		Audience:        []string{"spire-server"},
 		Repository:      "untrusted-org/repo",
 		RepositoryOwner: "untrusted-org",
 	})
