@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-03-24
+
+### Added
+- `allowed_repositories` configuration option to restrict attestation to specific
+  repositories (in `owner/repo` format). Multiple repositories can be specified.
+  When combined with `allowed_repository_owners`, both checks must pass.
+
 ## [0.2.0] - 2026-03-24
 
 ### Changed
