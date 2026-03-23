@@ -2,17 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2.0] - 2026-03-23
-
-### Removed
-- Workload Attestor: removed entirely based on community feedback. Environment variables
-  read from `/proc/<pid>/environ` cannot be cryptographically verified and are not
-  suitable for security-critical attestation. All GitHub Actions context is now
-  validated exclusively at the Node Attestor level via the OIDC JWT.
+## [0.2.0] - 2026-03-24
 
 ### Changed
-- `BuildSelectors` now returns `[]string` directly (simplified internal API)
-- README rewritten in English only; clarified design rationale
+- Removed Workload Attestor based on community feedback (credit: Kevin Fox, SPIFFE community).
+  Environment variables read from `/proc/<pid>/environ` cannot be cryptographically verified
+  and should not be used for security-critical attestation. All GitHub Actions context is
+  validated exclusively at the Node Attestor level via the OIDC JWT.
+- README rewritten to focus on `parentID`-based SVID issuance with a concrete usage example.
+- Simplified internal `BuildSelectors` API to return `[]string` directly.
 
 ## [0.1.0] - 2026-03-22
 
