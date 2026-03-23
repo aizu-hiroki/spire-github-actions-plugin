@@ -247,6 +247,43 @@ func TestAttest_AllowedOwnerRejected(t *testing.T) {
 	}
 }
 
+func TestAttest_AllowedRepositoryAccepted(t *testing.T) {
+	helper := newTestTokenHelper(t)
+	plug := configuredPlugin(t, helper, `
+		audience = "spire-server"
+		allowed_repositories = ["my-org/my-repo"]
+	`)
+
+	rawToken := helper.sign(t, validClaims())
+	payload, _ := json.Marshal(&githuboidc.AttestationDataWrapper{Token: rawToken})
+
+	err := mustAttest(plug, payload)
+	if err != nil {
+		t.Fatalf("expected success for allowed repository, got %v", err)
+	}
+}
+
+func TestAttest_AllowedRepositoryRejected(t *testing.T) {
+	helper := newTestTokenHelper(t)
+	plug := configuredPlugin(t, helper, `
+		audience = "spire-server"
+		allowed_repositories = ["my-org/my-repo"]
+	`)
+
+	claims := validClaims()
+	claims.Repository = "my-org/other-repo"
+	rawToken := helper.sign(t, claims)
+	payload, _ := json.Marshal(&githuboidc.AttestationDataWrapper{Token: rawToken})
+
+	err := mustAttest(plug, payload)
+	if err == nil {
+		t.Fatal("expected error for disallowed repository, got nil")
+	}
+	if s, ok := status.FromError(err); !ok || s.Code() != codes.PermissionDenied {
+		t.Errorf("expected PermissionDenied, got %v", err)
+	}
+}
+
 func TestAttest_EmptyPayload(t *testing.T) {
 	plug := server.New()
 	stream := &fakeAttestStream{

@@ -82,6 +82,9 @@ NodeAttestor "github_actions" {
     # Restrict attestation to specific GitHub organisation/user names.
     allowed_repository_owners = ["your-org"]
 
+    # Restrict attestation to specific repositories (owner/repo format).
+    allowed_repositories = ["your-org/your-repo"]
+
     # Must match the agent plugin's audience setting.
     audience = "spiffe://example.org"
 

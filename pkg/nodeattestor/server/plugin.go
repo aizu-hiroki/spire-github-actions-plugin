@@ -49,6 +49,10 @@ type pluginConfig struct {
 	// are allowed.
 	AllowedRepositoryOwners []string `hcl:"allowed_repository_owners"`
 
+	// AllowedRepositories is an optional list of GitHub repositories (in "owner/repo"
+	// format) that are allowed to attest.  If empty, all repositories are allowed.
+	AllowedRepositories []string `hcl:"allowed_repositories"`
+
 	// Audience is the expected OIDC token audience.  Must match the value
 	// configured in the agent plugin.  Defaults to "spire-server".
 	Audience string `hcl:"audience"`
@@ -154,19 +158,26 @@ func (p *Plugin) Attest(stream nodeattestorv1.NodeAttestor_AttestServer) error {
 
 	// Step 4: Enforce repository owner allow-list (if configured).
 	if len(cfg.AllowedRepositoryOwners) > 0 {
-		if err := checkAllowedOwner(claims.RepositoryOwner, cfg.AllowedRepositoryOwners); err != nil {
+		if err := checkAllowed("repository owner", claims.RepositoryOwner, cfg.AllowedRepositoryOwners); err != nil {
 			return status.Errorf(codes.PermissionDenied, "%v", err)
 		}
 	}
 
-	// Step 5: Build the SPIFFE agent ID.
+	// Step 5: Enforce repository allow-list (if configured).
+	if len(cfg.AllowedRepositories) > 0 {
+		if err := checkAllowed("repository", claims.Repository, cfg.AllowedRepositories); err != nil {
+			return status.Errorf(codes.PermissionDenied, "%v", err)
+		}
+	}
+
+	// Step 6: Build the SPIFFE agent ID.
 	agentID := githuboidc.AgentID(trustDomain, claims.Repository)
 
-	// Step 6: Build selector values from claims.
+	// Step 7: Build selector values from claims.
 	// SPIRE prepends the plugin name automatically; values are "key:value" strings.
 	selectorValues := githuboidc.BuildSelectors(claims)
 
-	// Step 7: Send the attestation result back to the agent.
+	// Step 8: Send the attestation result back to the agent.
 	if err := stream.Send(&nodeattestorv1.AttestResponse{
 		Response: &nodeattestorv1.AttestResponse_AgentAttributes{
 			AgentAttributes: &nodeattestorv1.AgentAttributes{
@@ -181,15 +192,12 @@ func (p *Plugin) Attest(stream nodeattestorv1.NodeAttestor_AttestServer) error {
 	return nil
 }
 
-// checkAllowedOwner returns an error if owner is not in the allowedOwners list.
-func checkAllowedOwner(owner string, allowedOwners []string) error {
-	for _, allowed := range allowedOwners {
-		if owner == allowed {
+// checkAllowed returns an error if value is not in the allowed list.
+func checkAllowed(label, value string, allowed []string) error {
+	for _, a := range allowed {
+		if value == a {
 			return nil
 		}
 	}
-	return fmt.Errorf(
-		"repository owner %q is not in the allowed list %v",
-		owner, allowedOwners,
-	)
+	return fmt.Errorf("%s %q is not in the allowed list %v", label, value, allowed)
 }

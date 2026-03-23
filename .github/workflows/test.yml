@@ -84,6 +84,7 @@ jobs:
               plugin_data {
                 audience                  = "spire-server"
                 allowed_repository_owners = ["aizu-hiroki"]
+                allowed_repositories      = ["aizu-hiroki/spire-github-actions-plugin"]
               }
             }
 
