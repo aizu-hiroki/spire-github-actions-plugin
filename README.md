@@ -26,10 +26,11 @@ workflows to authenticate using GitHub's OIDC tokens for Node Attestation.
 ```
 GitHub Actions runner
   └── SPIRE agent
-        └── sends GitHub OIDC token to SPIRE server
-              └── server validates JWT via GitHub JWKS
-                    └── issues SPIFFE ID to the agent
-                          └── workloads on the runner can obtain SVIDs
+        └── sends GitHub Actions OIDC token to SPIRE server
+              └── server validates JWT signature via GitHub's JWKS
+                    └── issues SPIFFE agent ID to the runner
+                          └── workloads on the runner obtain SVIDs
+                                via the Workload API
 ```
 
 The OIDC token is cryptographically signed by GitHub and verified against
@@ -40,7 +41,7 @@ GitHub's public JWKS endpoint. No long-lived credentials are required.
 | Binary | Type | Description |
 |--------|------|-------------|
 | `spire-plugin-github-actions-agent` | Node Attestor (agent-side) | Fetches a GitHub Actions OIDC token and sends it to the SPIRE server |
-| `spire-plugin-github-actions-server` | Node Attestor (server-side) | Validates the JWT using GitHub's JWKS, returns a SPIFFE ID and selectors |
+| `spire-plugin-github-actions-server` | Node Attestor (server-side) | Validates the JWT using GitHub's JWKS and returns a SPIFFE agent ID |
 
 ## Requirements
 
@@ -100,41 +101,35 @@ permissions:
   contents: read
 ```
 
-## Selectors
-
-The following selectors are derived from the GitHub Actions OIDC JWT and are
-cryptographically verified by GitHub's JWKS. SPIRE prepends the plugin name
-(`github_actions:`) automatically.
-
-| Selector value | JWT claim |
-|----------------|-----------|
-| `repository:<owner>/<repo>` | `repository` |
-| `repository_owner:<owner>` | `repository_owner` |
-| `repository_id:<id>` | `repository_id` |
-| `repository_owner_id:<id>` | `repository_owner_id` |
-| `repository_visibility:<visibility>` | `repository_visibility` |
-| `workflow:<name>` | `workflow` |
-| `workflow_ref:<ref>` | `workflow_ref` |
-| `job_workflow_ref:<ref>` | `job_workflow_ref` |
-| `ref:<ref>` | `ref` |
-| `ref_type:<type>` | `ref_type` |
-| `sha:<sha>` | `sha` |
-| `head_ref:<ref>` | `head_ref` (pull requests only) |
-| `base_ref:<ref>` | `base_ref` (pull requests only) |
-| `event_name:<event>` | `event_name` |
-| `actor:<user>` | `actor` |
-| `actor_id:<id>` | `actor_id` |
-| `run_id:<id>` | `run_id` |
-| `run_number:<n>` | `run_number` |
-| `run_attempt:<n>` | `run_attempt` |
-| `environment:<name>` | `environment` (deployment jobs only) |
-| `runner_environment:<type>` | `runner_environment` |
-
 ## Generated SPIFFE Agent ID
+
+After successful attestation, the SPIRE agent is identified by:
 
 ```
 spiffe://<trust-domain>/spire/agent/github_actions/<owner>/<repo>
 ```
+
+Example:
+
+```
+spiffe://example.org/spire/agent/github_actions/my-org/my-repo
+```
+
+## Issuing SVIDs to Workloads
+
+Use the agent's SPIFFE ID as the `parentID` when creating registration entries.
+Combined with a workload attestor (e.g., the built-in `unix` attestor), you can
+issue SVIDs to specific processes running on the GitHub Actions runner.
+
+```bash
+spire-server entry create \
+  -spiffeID "spiffe://example.org/deploy/production" \
+  -parentID "spiffe://example.org/spire/agent/github_actions/my-org/my-repo" \
+  -selector "unix:uid:1001"
+```
+
+This restricts SVID issuance to processes running as UID 1001 on a runner
+attested from the `my-org/my-repo` repository.
 
 ## License
 
