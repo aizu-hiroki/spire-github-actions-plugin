@@ -181,6 +181,42 @@ jobs:
           echo "✗ Workload SVID not issued within timeout"
           exit 1
 
+      # --- Node entry chaining test ---
+      # Verify that node-level selectors (from JWT claims) can be used to give
+      # different SPIFFE IDs to jobs based on ref, workflow, etc.
+
+      - name: Create node entry (branch-level alias)
+        run: |
+          AGENT_ID="spiffe://example.org/spire/agent/github_actions/aizu-hiroki/spire-github-actions-plugin"
+          spire-server entry create \
+            -spiffeID "spiffe://example.org/ci/branch/${GITHUB_REF_NAME}" \
+            -parentID "$AGENT_ID" \
+            -selector "github_actions:branch:${GITHUB_REF_NAME}" \
+            -node
+          echo "✓ Node entry created for branch: ${GITHUB_REF_NAME}"
+
+      - name: Create workload entry scoped to branch
+        run: |
+          spire-server entry create \
+            -spiffeID "spiffe://example.org/deploy/branch-scoped" \
+            -parentID "spiffe://example.org/ci/branch/${GITHUB_REF_NAME}" \
+            -selector "unix:uid:$(id -u)"
+          echo "✓ Branch-scoped workload entry created"
+
+      - name: Fetch branch-scoped workload SVID
+        run: |
+          for i in $(seq 1 20); do
+            if spire-agent api fetch x509 -socketPath /tmp/spire-agent.sock 2>/dev/null \
+                | grep -q "spiffe://example.org/deploy/branch-scoped"; then
+              echo "✓ Branch-scoped SVID issued successfully"
+              exit 0
+            fi
+            echo "Waiting for branch-scoped SVID sync... ($i/20)"
+            sleep 3
+          done
+          echo "✗ Branch-scoped SVID not issued within timeout"
+          exit 1
+
       - name: Dump diagnostics on failure
         if: failure()
         run: |

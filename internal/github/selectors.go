@@ -1,6 +1,9 @@
 package github
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // BuildSelectors generates SPIRE selector values from GitHub Actions OIDC claims.
 // Each value is in "key:value" format; SPIRE prepends the plugin name automatically.
@@ -32,6 +35,12 @@ func BuildSelectors(claims *Claims) []string {
 	add("sha", claims.SHA)
 	add("head_ref", claims.HeadRef)
 	add("base_ref", claims.BaseRef)
+
+	// Branch name (derived from ref when ref_type is "branch").
+	// e.g. refs/heads/main → branch:main
+	if claims.RefType == "branch" && strings.HasPrefix(claims.Ref, "refs/heads/") {
+		add("branch", strings.TrimPrefix(claims.Ref, "refs/heads/"))
+	}
 
 	// Trigger selectors.
 	add("event_name", claims.EventName)
