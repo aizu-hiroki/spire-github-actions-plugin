@@ -163,12 +163,8 @@ func (p *Plugin) Attest(stream nodeattestorv1.NodeAttestor_AttestServer) error {
 	agentID := githuboidc.AgentID(trustDomain, claims.Repository)
 
 	// Step 6: Build selector values from claims.
-	// The SPIRE v1 plugin SDK uses []string with "type:value" format.
-	rawSelectors := githuboidc.BuildSelectors(claims)
-	selectorValues := make([]string, 0, len(rawSelectors))
-	for _, sel := range rawSelectors {
-		selectorValues = append(selectorValues, sel.Value)
-	}
+	// SPIRE prepends the plugin name automatically; values are "key:value" strings.
+	selectorValues := githuboidc.BuildSelectors(claims)
 
 	// Step 7: Send the attestation result back to the agent.
 	if err := stream.Send(&nodeattestorv1.AttestResponse{

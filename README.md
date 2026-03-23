@@ -18,13 +18,22 @@
 
 ---
 
-[日本語](#日本語)
-
----
-
 A [SPIRE](https://github.com/spiffe/spire) plugin that enables GitHub Actions
-workflows to authenticate using GitHub's OIDC tokens for both Node Attestation
-and Workload Attestation.
+workflows to authenticate using GitHub's OIDC tokens for Node Attestation.
+
+## How it works
+
+```
+GitHub Actions runner
+  └── SPIRE agent
+        └── sends GitHub OIDC token to SPIRE server
+              └── server validates JWT via GitHub JWKS
+                    └── issues SPIFFE ID to the agent
+                          └── workloads on the runner can obtain SVIDs
+```
+
+The OIDC token is cryptographically signed by GitHub and verified against
+GitHub's public JWKS endpoint. No long-lived credentials are required.
 
 ## Plugins
 
@@ -32,20 +41,12 @@ and Workload Attestation.
 |--------|------|-------------|
 | `spire-plugin-github-actions-agent` | Node Attestor (agent-side) | Fetches a GitHub Actions OIDC token and sends it to the SPIRE server |
 | `spire-plugin-github-actions-server` | Node Attestor (server-side) | Validates the JWT using GitHub's JWKS, returns a SPIFFE ID and selectors |
-| `spire-plugin-github-actions-workload` | Workload Attestor (**advisory only**) | Reads `/proc/<pid>/environ` on Linux and returns GitHub Actions context as selectors |
-
-> **Note on Workload Attestor:** The Workload Attestor reads environment variables from
-> `/proc/<pid>/environ`, which can be tampered with by the process or any process with
-> sufficient privileges. It is **not a substitute for Node Attestation** and should only
-> be used as advisory supplemental information alongside the Node Attestor.
-> Security-critical decisions must rely on Node Attestor selectors, which are
-> derived from cryptographically verified JWT claims.
 
 ## Requirements
 
 - Go 1.21+
 - SPIRE v1.x
-- Linux (workload attestor requires `/proc` filesystem)
+- Linux
 
 ## Build
 
@@ -67,14 +68,6 @@ NodeAttestor "github_actions" {
     # Use a value that uniquely identifies your SPIRE server,
     # e.g. the trust domain URI.
     audience = "spiffe://example.org"
-  }
-}
-
-WorkloadAttestor "github_actions" {
-  plugin_cmd  = "/usr/local/bin/spire-plugin-github-actions-workload"
-  plugin_data {
-    # Optional: emit additional env vars as selectors.
-    # extra_env_vars = ["MY_CUSTOM_VAR"]
   }
 }
 ```
@@ -109,61 +102,33 @@ permissions:
 
 ## Selectors
 
-### Node Attestor Selectors (cryptographically verified)
+The following selectors are derived from the GitHub Actions OIDC JWT and are
+cryptographically verified by GitHub's JWKS. SPIRE prepends the plugin name
+(`github_actions:`) automatically.
 
-These selectors are derived from the GitHub Actions OIDC JWT, which is
-cryptographically signed by GitHub and verified against GitHub's JWKS.
-They are suitable for security-critical decisions.
-
-| Selector | JWT Claim |
-|----------|-----------|
-| `github_actions:repository:<owner>/<repo>` | `repository` |
-| `github_actions:repository_owner:<owner>` | `repository_owner` |
-| `github_actions:workflow:<name>` | `workflow` |
-| `github_actions:workflow_ref:<ref>` | `workflow_ref` |
-| `github_actions:job:<id>` | `job_workflow_ref` |
-| `github_actions:ref:<ref>` | `ref` |
-| `github_actions:ref_type:<type>` | `ref_type` |
-| `github_actions:sha:<sha>` | `sha` |
-| `github_actions:head_ref:<ref>` | `head_ref` (pull requests) |
-| `github_actions:base_ref:<ref>` | `base_ref` (pull requests) |
-| `github_actions:event_name:<event>` | `event_name` |
-| `github_actions:actor:<user>` | `actor` |
-| `github_actions:run_id:<id>` | `run_id` |
-| `github_actions:run_number:<n>` | `run_number` |
-| `github_actions:run_attempt:<n>` | `run_attempt` |
-| `github_actions:environment:<name>` | `environment` (deployment jobs) |
-| `github_actions:runner_environment:<type>` | `runner_environment` |
-
-### Workload Attestor Selectors (advisory only)
-
-> ⚠️ These selectors are read from `/proc/<pid>/environ` and are **not
-> cryptographically verified**. Environment variables can be set arbitrarily
-> by the process owner. **Do not use these selectors alone for
-> security-critical access control.** Use them only as supplemental
-> information in combination with Node Attestor selectors.
-
-| Selector | Environment Variable |
-|----------|---------------------|
-| `github_actions:repository:<owner>/<repo>` | `GITHUB_REPOSITORY` |
-| `github_actions:repository_owner:<owner>` | `GITHUB_REPOSITORY_OWNER` |
-| `github_actions:workflow:<name>` | `GITHUB_WORKFLOW` |
-| `github_actions:workflow_ref:<ref>` | `GITHUB_WORKFLOW_REF` |
-| `github_actions:job:<id>` | `GITHUB_JOB` |
-| `github_actions:ref:<ref>` | `GITHUB_REF` |
-| `github_actions:ref_type:<type>` | `GITHUB_REF_TYPE` |
-| `github_actions:sha:<sha>` | `GITHUB_SHA` |
-| `github_actions:head_ref:<ref>` | `GITHUB_HEAD_REF` (pull requests) |
-| `github_actions:base_ref:<ref>` | `GITHUB_BASE_REF` (pull requests) |
-| `github_actions:event_name:<event>` | `GITHUB_EVENT_NAME` |
-| `github_actions:actor:<user>` | `GITHUB_ACTOR` |
-| `github_actions:run_id:<id>` | `GITHUB_RUN_ID` |
-| `github_actions:run_number:<n>` | `GITHUB_RUN_NUMBER` |
-| `github_actions:run_attempt:<n>` | `GITHUB_RUN_ATTEMPT` |
-| `github_actions:environment:<name>` | `GITHUB_ENVIRONMENT` (deployment jobs) |
-| `github_actions:runner_environment:<type>` | `RUNNER_ENVIRONMENT` |
-| `github_actions:runner_os:<os>` | `RUNNER_OS` |
-| `github_actions:runner_arch:<arch>` | `RUNNER_ARCH` |
+| Selector value | JWT claim |
+|----------------|-----------|
+| `repository:<owner>/<repo>` | `repository` |
+| `repository_owner:<owner>` | `repository_owner` |
+| `repository_id:<id>` | `repository_id` |
+| `repository_owner_id:<id>` | `repository_owner_id` |
+| `repository_visibility:<visibility>` | `repository_visibility` |
+| `workflow:<name>` | `workflow` |
+| `workflow_ref:<ref>` | `workflow_ref` |
+| `job_workflow_ref:<ref>` | `job_workflow_ref` |
+| `ref:<ref>` | `ref` |
+| `ref_type:<type>` | `ref_type` |
+| `sha:<sha>` | `sha` |
+| `head_ref:<ref>` | `head_ref` (pull requests only) |
+| `base_ref:<ref>` | `base_ref` (pull requests only) |
+| `event_name:<event>` | `event_name` |
+| `actor:<user>` | `actor` |
+| `actor_id:<id>` | `actor_id` |
+| `run_id:<id>` | `run_id` |
+| `run_number:<n>` | `run_number` |
+| `run_attempt:<n>` | `run_attempt` |
+| `environment:<name>` | `environment` (deployment jobs only) |
+| `runner_environment:<type>` | `runner_environment` |
 
 ## Generated SPIFFE Agent ID
 
@@ -174,52 +139,3 @@ spiffe://<trust-domain>/spire/agent/github_actions/<owner>/<repo>
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).
-
----
-
-## 日本語
-
-GitHub Actions の OIDC トークンを使った [SPIRE](https://github.com/spiffe/spire) 向けの
-Node Attestation / Workload Attestation プラグインです。
-
-### プラグイン構成
-
-| バイナリ | 種別 | 説明 |
-|---------|------|------|
-| `spire-plugin-github-actions-agent` | Node Attestor (agent) | GitHub Actions OIDC トークンを取得してサーバーへ送信 |
-| `spire-plugin-github-actions-server` | Node Attestor (server) | JWT を検証し SPIFFE ID とセレクターを返す |
-| `spire-plugin-github-actions-workload` | Workload Attestor（**advisory のみ**） | `/proc/<pid>/environ` から GitHub Actions コンテキストを読み取りセレクターを返す |
-
-> **Workload Attestor についての注意：** Workload Attestor は `/proc/<pid>/environ`
-> から環境変数を読み取りますが、環境変数はプロセスや十分な権限を持つ別プロセスによって
-> 改ざんされる可能性があります。**Node Attestor の代替にはなりません。**
-> セキュリティ上重要な判断は、GitHub の JWKS で暗号学的に検証された
-> Node Attestor のセレクターに基づいて行ってください。
-> Workload Attestor はあくまで Node Attestor と組み合わせた advisory（参考情報）
-> としての補助的な用途にのみ使用してください。
-
-### ビルド
-
-```bash
-go mod tidy
-make build
-# bin/ 以下にバイナリが生成されます
-```
-
-### GitHub Actions ワークフロー設定
-
-```yaml
-permissions:
-  id-token: write   # OIDC トークンの取得に必要
-  contents: read
-```
-
-### 免責事項
-
-本プロジェクトは非公式のコミュニティプラグインであり、SPIFFE、SPIRE、CNCF、および GitHub とは一切関係がなく、これらによる承認を受けたものでもありません。
-
-本ソフトウェアは実験的なものであり、現状のまま（"as-is"）提供されます。
-明示または黙示を問わず、いかなる保証も行いません。
-本ソフトウェアの使用によって生じたいかなる損害・損失・セキュリティ上の問題についても、
-作者および貢献者は一切の責任を負いません。
-**本ソフトウェアの利用はすべて利用者自身の責任において行ってください。**
