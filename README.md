@@ -28,7 +28,7 @@ GitHub Actions runner
   └── SPIRE agent
         └── sends GitHub Actions OIDC token to SPIRE server
               └── server validates JWT signature via GitHub's JWKS
-                    └── issues SPIFFE agent ID to the runner
+                    └── issues SPIFFE agent ID + node-level selectors
                           └── workloads on the runner obtain SVIDs
                                 via the Workload API
 ```
@@ -41,7 +41,7 @@ GitHub's public JWKS endpoint. No long-lived credentials are required.
 | Binary | Type | Description |
 |--------|------|-------------|
 | `spire-plugin-github-actions-agent` | Node Attestor (agent-side) | Fetches a GitHub Actions OIDC token and sends it to the SPIRE server |
-| `spire-plugin-github-actions-server` | Node Attestor (server-side) | Validates the JWT using GitHub's JWKS and returns a SPIFFE agent ID |
+| `spire-plugin-github-actions-server` | Node Attestor (server-side) | Validates the JWT using GitHub's JWKS and returns a SPIFFE agent ID and node-level selectors |
 
 ## Requirements
 
@@ -118,11 +118,43 @@ Example:
 spiffe://example.org/spire/agent/github_actions/my-org/my-repo
 ```
 
+## Selectors
+
+These selectors are derived from the GitHub Actions OIDC JWT and are
+cryptographically verified via GitHub's JWKS. SPIRE stores them as
+node-level selectors for the attested agent.
+
+| Selector value | Source |
+|----------------|--------|
+| `repository:<owner>/<repo>` | JWT `repository` claim |
+| `repository_owner:<owner>` | JWT `repository_owner` claim |
+| `repository_id:<id>` | JWT `repository_id` claim |
+| `repository_owner_id:<id>` | JWT `repository_owner_id` claim |
+| `repository_visibility:<visibility>` | JWT `repository_visibility` claim |
+| `workflow:<name>` | JWT `workflow` claim |
+| `workflow_ref:<ref>` | JWT `workflow_ref` claim |
+| `job_workflow_ref:<ref>` | JWT `job_workflow_ref` claim |
+| `ref:<ref>` | JWT `ref` claim |
+| `ref_type:<type>` | JWT `ref_type` claim |
+| `branch:<name>` | derived from `ref` when `ref_type` is `branch` (e.g. `refs/heads/main` → `branch:main`) |
+| `sha:<sha>` | JWT `sha` claim |
+| `head_ref:<ref>` | JWT `head_ref` claim (pull requests only) |
+| `base_ref:<ref>` | JWT `base_ref` claim (pull requests only) |
+| `event_name:<event>` | JWT `event_name` claim |
+| `actor:<user>` | JWT `actor` claim |
+| `actor_id:<id>` | JWT `actor_id` claim |
+| `run_id:<id>` | JWT `run_id` claim |
+| `run_number:<n>` | JWT `run_number` claim |
+| `run_attempt:<n>` | JWT `run_attempt` claim |
+| `environment:<name>` | JWT `environment` claim (deployment jobs only) |
+| `runner_environment:<type>` | JWT `runner_environment` claim |
+
 ## Issuing SVIDs to Workloads
 
-Use the agent's SPIFFE ID as the `parentID` when creating registration entries.
-Combined with a workload attestor (e.g., the built-in `unix` attestor), you can
-issue SVIDs to specific processes running on the GitHub Actions runner.
+### Pattern 1: Repository-scoped (simple)
+
+Use the agent's SPIFFE ID as `parentID` to restrict SVID issuance to a
+specific repository. Combined with the built-in `unix` workload attestor:
 
 ```bash
 spire-server entry create \
@@ -131,8 +163,29 @@ spire-server entry create \
   -selector "unix:uid:1001"
 ```
 
-This restricts SVID issuance to processes running as UID 1001 on a runner
-attested from the `my-org/my-repo` repository.
+### Pattern 2: Branch-scoped (node entry chaining)
+
+Use a node entry to assign an alias SPIFFE ID to agents matching a specific
+branch, then issue workload SVIDs from that alias. This allows different
+identities for jobs running on different branches.
+
+```bash
+# Step 1: assign an alias to agents attested from the main branch
+spire-server entry create \
+  -spiffeID "spiffe://example.org/ci/branch/main" \
+  -parentID  "spiffe://example.org/spire/agent/github_actions/my-org/my-repo" \
+  -selector  "github_actions:branch:main" \
+  -node
+
+# Step 2: issue a workload SVID scoped to that branch
+spire-server entry create \
+  -spiffeID "spiffe://example.org/deploy/production" \
+  -parentID  "spiffe://example.org/ci/branch/main" \
+  -selector  "unix:uid:1001"
+```
+
+Only a runner attested from `my-org/my-repo` on the `main` branch, running
+a process as UID 1001, will receive the `deploy/production` SVID.
 
 ## License
 
