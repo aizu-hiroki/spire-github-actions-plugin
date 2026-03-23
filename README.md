@@ -32,7 +32,14 @@ and Workload Attestation.
 |--------|------|-------------|
 | `spire-plugin-github-actions-agent` | Node Attestor (agent-side) | Fetches a GitHub Actions OIDC token and sends it to the SPIRE server |
 | `spire-plugin-github-actions-server` | Node Attestor (server-side) | Validates the JWT using GitHub's JWKS, returns a SPIFFE ID and selectors |
-| `spire-plugin-github-actions-workload` | Workload Attestor | Reads `/proc/<pid>/environ` on Linux and returns GitHub Actions context as selectors |
+| `spire-plugin-github-actions-workload` | Workload Attestor (**advisory only**) | Reads `/proc/<pid>/environ` on Linux and returns GitHub Actions context as selectors |
+
+> **Note on Workload Attestor:** The Workload Attestor reads environment variables from
+> `/proc/<pid>/environ`, which can be tampered with by the process or any process with
+> sufficient privileges. It is **not a substitute for Node Attestation** and should only
+> be used as advisory supplemental information alongside the Node Attestor.
+> Security-critical decisions must rely on Node Attestor selectors, which are
+> derived from cryptographically verified JWT claims.
 
 ## Requirements
 
@@ -102,10 +109,42 @@ permissions:
 
 ## Selectors
 
-The following selectors are produced by both the node attestor and workload attestor:
+### Node Attestor Selectors (cryptographically verified)
 
-| Selector | Source |
-|----------|--------|
+These selectors are derived from the GitHub Actions OIDC JWT, which is
+cryptographically signed by GitHub and verified against GitHub's JWKS.
+They are suitable for security-critical decisions.
+
+| Selector | JWT Claim |
+|----------|-----------|
+| `github_actions:repository:<owner>/<repo>` | `repository` |
+| `github_actions:repository_owner:<owner>` | `repository_owner` |
+| `github_actions:workflow:<name>` | `workflow` |
+| `github_actions:workflow_ref:<ref>` | `workflow_ref` |
+| `github_actions:job:<id>` | `job_workflow_ref` |
+| `github_actions:ref:<ref>` | `ref` |
+| `github_actions:ref_type:<type>` | `ref_type` |
+| `github_actions:sha:<sha>` | `sha` |
+| `github_actions:head_ref:<ref>` | `head_ref` (pull requests) |
+| `github_actions:base_ref:<ref>` | `base_ref` (pull requests) |
+| `github_actions:event_name:<event>` | `event_name` |
+| `github_actions:actor:<user>` | `actor` |
+| `github_actions:run_id:<id>` | `run_id` |
+| `github_actions:run_number:<n>` | `run_number` |
+| `github_actions:run_attempt:<n>` | `run_attempt` |
+| `github_actions:environment:<name>` | `environment` (deployment jobs) |
+| `github_actions:runner_environment:<type>` | `runner_environment` |
+
+### Workload Attestor Selectors (advisory only)
+
+> ⚠️ These selectors are read from `/proc/<pid>/environ` and are **not
+> cryptographically verified**. Environment variables can be set arbitrarily
+> by the process owner. **Do not use these selectors alone for
+> security-critical access control.** Use them only as supplemental
+> information in combination with Node Attestor selectors.
+
+| Selector | Environment Variable |
+|----------|---------------------|
 | `github_actions:repository:<owner>/<repo>` | `GITHUB_REPOSITORY` |
 | `github_actions:repository_owner:<owner>` | `GITHUB_REPOSITORY_OWNER` |
 | `github_actions:workflow:<name>` | `GITHUB_WORKFLOW` |
@@ -149,7 +188,15 @@ Node Attestation / Workload Attestation プラグインです。
 |---------|------|------|
 | `spire-plugin-github-actions-agent` | Node Attestor (agent) | GitHub Actions OIDC トークンを取得してサーバーへ送信 |
 | `spire-plugin-github-actions-server` | Node Attestor (server) | JWT を検証し SPIFFE ID とセレクターを返す |
-| `spire-plugin-github-actions-workload` | Workload Attestor | `/proc/<pid>/environ` から GitHub Actions コンテキストを読み取りセレクターを返す |
+| `spire-plugin-github-actions-workload` | Workload Attestor（**advisory のみ**） | `/proc/<pid>/environ` から GitHub Actions コンテキストを読み取りセレクターを返す |
+
+> **Workload Attestor についての注意：** Workload Attestor は `/proc/<pid>/environ`
+> から環境変数を読み取りますが、環境変数はプロセスや十分な権限を持つ別プロセスによって
+> 改ざんされる可能性があります。**Node Attestor の代替にはなりません。**
+> セキュリティ上重要な判断は、GitHub の JWKS で暗号学的に検証された
+> Node Attestor のセレクターに基づいて行ってください。
+> Workload Attestor はあくまで Node Attestor と組み合わせた advisory（参考情報）
+> としての補助的な用途にのみ使用してください。
 
 ### ビルド
 
