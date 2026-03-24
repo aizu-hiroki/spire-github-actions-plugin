@@ -2,7 +2,7 @@
 
 ![Test](https://github.com/aizu-hiroki/spire-github-actions-plugin/actions/workflows/test.yml/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8.svg)](go.mod)
+[![Go](https://img.shields.io/badge/Go-1.26+-00ADD8.svg)](go.mod)
 
 > **⚠️ EXPERIMENTAL — USE AT YOUR OWN RISK**
 >
@@ -45,7 +45,7 @@ GitHub's public JWKS endpoint. No long-lived credentials are required.
 
 ## Requirements
 
-- Go 1.21+
+- Go 1.26+
 - SPIRE v1.x
 - Linux
 
@@ -75,17 +75,21 @@ NodeAttestor "github_actions" {
 
 ### SPIRE Server (`spire-server.conf`)
 
+At least one of `allowed_repository_owners` or `allowed_repositories` must be
+configured. Omitting both is rejected at startup to prevent unintentionally
+allowing attestation from any GitHub repository.
+
 ```hcl
 NodeAttestor "github_actions" {
   plugin_cmd  = "/usr/local/bin/spire-plugin-github-actions-server"
   plugin_data {
-    # Restrict attestation to specific GitHub organisation/user names.
+    # Required: restrict attestation to specific GitHub organisation/user names.
     allowed_repository_owners = ["your-org"]
 
-    # Restrict attestation to specific repositories (owner/repo format).
-    allowed_repositories = ["your-org/your-repo"]
+    # Optional: further restrict to specific repositories (owner/repo format).
+    # allowed_repositories = ["your-org/your-repo"]
 
-    # Must match the agent plugin's audience setting.
+    # Required: must match the agent plugin's audience setting. Must not be empty.
     audience = "spiffe://example.org"
 
     # Optional: override OIDC issuer (for GitHub Enterprise Server).
