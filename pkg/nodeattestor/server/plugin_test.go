@@ -157,7 +157,10 @@ func configuredPlugin(t *testing.T, helper *testTokenHelper, hcl string) *server
 
 func TestAttest_Success(t *testing.T) {
 	helper := newTestTokenHelper(t)
-	plug := configuredPlugin(t, helper, `audience = "spire-server"`)
+	plug := configuredPlugin(t, helper, `
+		audience = "spire-server"
+		allowed_repository_owners = ["my-org"]
+	`)
 
 	rawToken := helper.sign(t, &githuboidc.Claims{
 		Issuer:          "https://token.actions.githubusercontent.com",
@@ -305,7 +308,10 @@ func TestAttest_InvalidSignature(t *testing.T) {
 	wrongHelper := newTestTokenHelper(t) // different RSA key pair
 
 	// Validator uses helper's public key, but token is signed with wrongHelper's key.
-	plug := configuredPlugin(t, helper, `audience = "spire-server"`)
+	plug := configuredPlugin(t, helper, `
+		audience = "spire-server"
+		allowed_repository_owners = ["my-org"]
+	`)
 
 	rawToken := wrongHelper.sign(t, validClaims())
 	payload, _ := json.Marshal(&githuboidc.AttestationDataWrapper{Token: rawToken})
@@ -321,7 +327,10 @@ func TestAttest_InvalidSignature(t *testing.T) {
 
 func TestAttest_ExpiredToken(t *testing.T) {
 	helper := newTestTokenHelper(t)
-	plug := configuredPlugin(t, helper, `audience = "spire-server"`)
+	plug := configuredPlugin(t, helper, `
+		audience = "spire-server"
+		allowed_repository_owners = ["my-org"]
+	`)
 
 	rawToken := helper.signExpired(t, validClaims())
 	payload, _ := json.Marshal(&githuboidc.AttestationDataWrapper{Token: rawToken})
@@ -337,7 +346,10 @@ func TestAttest_ExpiredToken(t *testing.T) {
 
 func TestAttest_WrongIssuer(t *testing.T) {
 	helper := newTestTokenHelper(t)
-	plug := configuredPlugin(t, helper, `audience = "spire-server"`)
+	plug := configuredPlugin(t, helper, `
+		audience = "spire-server"
+		allowed_repository_owners = ["my-org"]
+	`)
 
 	claims := validClaims()
 	claims.Issuer = "https://evil.example.com"
@@ -355,7 +367,10 @@ func TestAttest_WrongIssuer(t *testing.T) {
 
 func TestAttest_WrongAudience(t *testing.T) {
 	helper := newTestTokenHelper(t)
-	plug := configuredPlugin(t, helper, `audience = "spire-server"`)
+	plug := configuredPlugin(t, helper, `
+		audience = "spire-server"
+		allowed_repository_owners = ["my-org"]
+	`)
 
 	claims := validClaims()
 	claims.Audience = []string{"wrong-audience"}
@@ -377,6 +392,37 @@ func TestAttest_InvalidJSON(t *testing.T) {
 	err := mustAttest(plug, []byte("not-valid-json{{{"))
 	if err == nil {
 		t.Fatal("expected error for invalid JSON payload, got nil")
+	}
+	if s, ok := status.FromError(err); !ok || s.Code() != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestConfigure_EmptyAudience(t *testing.T) {
+	plug := server.New()
+	_, err := plug.Configure(context.Background(), &configv1.ConfigureRequest{
+		HclConfiguration: `
+			audience = ""
+			allowed_repository_owners = ["my-org"]
+		`,
+		CoreConfiguration: &configv1.CoreConfiguration{TrustDomain: "example.org"},
+	})
+	if err == nil {
+		t.Fatal("expected error for empty audience, got nil")
+	}
+	if s, ok := status.FromError(err); !ok || s.Code() != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestConfigure_NoAllowList(t *testing.T) {
+	plug := server.New()
+	_, err := plug.Configure(context.Background(), &configv1.ConfigureRequest{
+		HclConfiguration:  `audience = "spire-server"`,
+		CoreConfiguration: &configv1.CoreConfiguration{TrustDomain: "example.org"},
+	})
+	if err == nil {
+		t.Fatal("expected error when no allow-list is configured, got nil")
 	}
 	if s, ok := status.FromError(err); !ok || s.Code() != codes.InvalidArgument {
 		t.Errorf("expected InvalidArgument, got %v", err)

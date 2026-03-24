@@ -102,6 +102,16 @@ func (p *Plugin) Configure(_ context.Context, req *configv1.ConfigureRequest) (*
 		}
 	}
 
+	if cfg.Audience == "" {
+		return nil, status.Error(codes.InvalidArgument,
+			"audience must not be empty; set audience in plugin configuration")
+	}
+
+	if len(cfg.AllowedRepositories) == 0 && len(cfg.AllowedRepositoryOwners) == 0 {
+		return nil, status.Error(codes.InvalidArgument,
+			"at least one of allowed_repositories or allowed_repository_owners must be configured")
+	}
+
 	p.mu.Lock()
 	p.cfg = cfg
 	p.trustDomain = req.CoreConfiguration.GetTrustDomain()
