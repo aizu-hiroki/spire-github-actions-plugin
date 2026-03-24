@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-03-24
+
+### Changed
+- `allowed_repository_owners` or `allowed_repositories` is now required in the
+  server plugin configuration. Omitting both is rejected at startup to prevent
+  unintentional open access from any GitHub repository.
+- `audience` must not be empty. An empty value is rejected at startup.
+- Updated Go to 1.26.1 and bumped dependencies to resolve security
+  vulnerabilities (golang-jwt/jwt/v4 → v4.5.2, golang.org/x/net → v0.52.0,
+  google.golang.org/grpc → v1.79.3, google.golang.org/protobuf → v1.36.11).
+
 ## [0.3.0] - 2026-03-24
 
 ### Added
