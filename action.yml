@@ -1,0 +1,42 @@
+name: 'SPIRE GitHub Actions Attestation'
+description: 'Attest GitHub Actions workflows to a SPIRE server using OIDC and obtain X.509 SVIDs'
+author: 'aizu-hiroki'
+
+branding:
+  icon: 'shield'
+  color: 'green'
+
+inputs:
+  spire-server-address:
+    description: 'SPIRE server address (IP or hostname)'
+    required: true
+  spire-server-port:
+    description: 'SPIRE server port'
+    required: false
+    default: '8081'
+  trust-domain:
+    description: 'SPIFFE trust domain'
+    required: true
+  audience:
+    description: 'Expected audience for the OIDC token (default: spiffe://<trust-domain>)'
+    required: false
+    default: ''
+
+outputs:
+  spiffe-id:
+    description: 'The SPIFFE ID assigned to the workload'
+  svid-cert:
+    description: 'Path to the X.509 SVID certificate PEM file'
+  svid-key:
+    description: 'Path to the X.509 SVID private key PEM file'
+  bundle:
+    description: 'Path to the trust bundle PEM file'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - ${{ inputs.spire-server-address }}
+    - ${{ inputs.spire-server-port }}
+    - ${{ inputs.trust-domain }}
+    - ${{ inputs.audience }}

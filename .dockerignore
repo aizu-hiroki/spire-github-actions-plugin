@@ -1,0 +1,8 @@
+.git
+.github
+*.exe
+*.md
+LICENSE
+SECURITY.md
+CHANGELOG.md
+nodeattestor-server-linux

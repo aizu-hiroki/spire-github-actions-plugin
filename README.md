@@ -21,6 +21,27 @@
 A [SPIRE](https://github.com/spiffe/spire) plugin that enables GitHub Actions
 workflows to authenticate using GitHub's OIDC tokens for Node Attestation.
 
+## Quick Start
+
+```yaml
+permissions:
+  id-token: write
+
+steps:
+  - uses: aizu-hiroki/spire-github-actions-plugin@v1
+    id: spire
+    with:
+      spire-server-address: "spire.example.com"
+      trust-domain: "example.org"
+
+  - run: |
+      # Use the SVID for mTLS
+      curl --cert "${{ steps.spire.outputs.svid-cert }}" \
+           --key  "${{ steps.spire.outputs.svid-key }}" \
+           --cacert "${{ steps.spire.outputs.bundle }}" \
+           https://api.example.com/deploy
+```
+
 ## How it works
 
 ```
@@ -190,6 +211,24 @@ spire-server entry create \
 
 Only a runner attested from `my-org/my-repo` on the `main` branch, running
 a process as UID 1001, will receive the `deploy/production` SVID.
+
+## Action Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `spire-server-address` | Yes | | SPIRE server address (IP or hostname) |
+| `spire-server-port` | No | `8081` | SPIRE server port |
+| `trust-domain` | Yes | | SPIFFE trust domain |
+| `audience` | No | `spiffe://<trust-domain>` | Expected audience for OIDC token |
+
+## Action Outputs
+
+| Output | Description |
+|--------|-------------|
+| `spiffe-id` | The SPIFFE ID assigned to the workload |
+| `svid-cert` | Path to the X.509 SVID certificate PEM file |
+| `svid-key` | Path to the X.509 SVID private key PEM file |
+| `bundle` | Path to the trust bundle PEM file |
 
 ## License
 
