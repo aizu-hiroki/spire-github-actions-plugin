@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binaries
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o dist/nodeattestor-server-linux-amd64 ./cmd/nodeattestor-server/
+          GOOS=linux GOARCH=arm64 go build -o dist/nodeattestor-server-linux-arm64 ./cmd/nodeattestor-server/
+          GOOS=linux GOARCH=amd64 go build -o dist/nodeattestor-agent-linux-amd64 ./cmd/nodeattestor-agent/
+          GOOS=linux GOARCH=arm64 go build -o dist/nodeattestor-agent-linux-arm64 ./cmd/nodeattestor-agent/
+
+      - name: Create checksums
+        run: |
+          cd dist
+          sha256sum * > checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: false
+          body_path: ''
+          files: |
+            dist/nodeattestor-server-linux-amd64
+            dist/nodeattestor-server-linux-arm64
+            dist/nodeattestor-agent-linux-amd64
+            dist/nodeattestor-agent-linux-arm64
+            dist/checksums.txt

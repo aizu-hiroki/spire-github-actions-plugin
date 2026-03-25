@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-03-26
+
+### Added
+- Docker Action for easy integration (`uses: aizu-hiroki/spire-github-actions-plugin@v0.5.0`)
+- Optional JWT-SVID support with multiple audiences via `jwt-audiences` input (comma-separated)
+- `jwt-svids` output as JSON object mapping audience to JWT-SVID token
+- Automated release workflow with pre-built binaries (linux/amd64, linux/arm64)
+
 ## [0.4.0] - 2026-03-24
 
 ### Changed
