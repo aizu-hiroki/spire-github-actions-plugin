@@ -26,11 +26,11 @@ outputs:
   spiffe-id:
     description: 'The SPIFFE ID assigned to the workload'
   svid-cert:
-    description: 'Path to the X.509 SVID certificate PEM file'
+    description: 'Relative path to the X.509 SVID certificate PEM file (prefix with ${{ github.workspace }}/)'
   svid-key:
-    description: 'Path to the X.509 SVID private key PEM file'
+    description: 'Relative path to the X.509 SVID private key PEM file (prefix with ${{ github.workspace }}/)'
   bundle:
-    description: 'Path to the trust bundle PEM file'
+    description: 'Relative path to the trust bundle PEM file (prefix with ${{ github.workspace }}/)'
 
 runs:
   using: 'docker'

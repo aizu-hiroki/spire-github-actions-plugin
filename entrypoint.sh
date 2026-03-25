@@ -99,11 +99,13 @@ echo "::endgroup::"
 # Stop agent
 kill $AGENT_PID 2>/dev/null || true
 
-# Set outputs (paths relative to host workspace)
-WORKSPACE="${GITHUB_WORKSPACE:-.}"
+# Set outputs
+# Inside Docker container, workspace is /github/workspace
+# On the host, it's $GITHUB_WORKSPACE (different path)
+# Output relative paths so users can prepend ${{ github.workspace }}
 echo "spiffe-id=${SPIFFE_ID}" >> "$GITHUB_OUTPUT"
-echo "svid-cert=${WORKSPACE}/.spire-svid/svid.0.pem" >> "$GITHUB_OUTPUT"
-echo "svid-key=${WORKSPACE}/.spire-svid/svid.0.key" >> "$GITHUB_OUTPUT"
-echo "bundle=${WORKSPACE}/.spire-svid/bundle.0.pem" >> "$GITHUB_OUTPUT"
+echo "svid-cert=.spire-svid/svid.0.pem" >> "$GITHUB_OUTPUT"
+echo "svid-key=.spire-svid/svid.0.key" >> "$GITHUB_OUTPUT"
+echo "bundle=.spire-svid/bundle.0.pem" >> "$GITHUB_OUTPUT"
 
-echo "Done - SVID files available at ${WORKSPACE}/.spire-svid/"
+echo "Done - SVID files written to workspace/.spire-svid/"
