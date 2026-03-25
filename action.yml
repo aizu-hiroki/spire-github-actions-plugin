@@ -21,6 +21,10 @@ inputs:
     description: 'Expected audience for the OIDC token (default: spiffe://<trust-domain>)'
     required: false
     default: ''
+  jwt-audiences:
+    description: 'Comma-separated list of audiences for JWT-SVIDs (optional, skipped if empty)'
+    required: false
+    default: ''
 
 outputs:
   spiffe-id:
@@ -31,6 +35,8 @@ outputs:
     description: 'Relative path to the X.509 SVID private key PEM file (prefix with ${{ github.workspace }}/)'
   bundle:
     description: 'Relative path to the trust bundle PEM file (prefix with ${{ github.workspace }}/)'
+  jwt-svids:
+    description: 'JSON object mapping audience to JWT-SVID token (empty if jwt-audiences not set)'
 
 runs:
   using: 'docker'
@@ -40,3 +46,4 @@ runs:
     - ${{ inputs.spire-server-port }}
     - ${{ inputs.trust-domain }}
     - ${{ inputs.audience }}
+    - ${{ inputs.jwt-audiences }}

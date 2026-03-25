@@ -5,6 +5,7 @@ SPIRE_SERVER_ADDRESS="$1"
 SPIRE_SERVER_PORT="$2"
 TRUST_DOMAIN="$3"
 AUDIENCE="${4:-spiffe://${TRUST_DOMAIN}}"
+JWT_AUDIENCES="${5:-}"
 
 # Use audience default if empty string was passed
 if [ -z "$AUDIENCE" ]; then
@@ -96,6 +97,45 @@ spire-agent api fetch x509 -socketPath "$SOCKET"
 
 echo "::endgroup::"
 
+# Fetch JWT-SVIDs if audiences specified
+JWT_JSON="{}"
+if [ -n "$JWT_AUDIENCES" ]; then
+  echo "::group::Fetch JWT-SVIDs"
+
+  IFS=',' read -ra AUDIENCES <<< "$JWT_AUDIENCES"
+  for aud in "${AUDIENCES[@]}"; do
+    aud=$(echo "$aud" | xargs)  # trim whitespace
+    if [ -z "$aud" ]; then
+      continue
+    fi
+    echo "Fetching JWT-SVID for audience: ${aud}"
+    JWT_TOKEN=""
+    for i in $(seq 1 10); do
+      JWT_OUTPUT=$(spire-agent api fetch jwt -audience "$aud" -socketPath "$SOCKET" 2>/dev/null || true)
+      JWT_TOKEN=$(echo "$JWT_OUTPUT" | grep -A1 "token(" | tail -1 | xargs || true)
+      if [ -n "$JWT_TOKEN" ] && [ "$JWT_TOKEN" != ")" ]; then
+        break
+      fi
+      if [ "$i" -eq 10 ]; then
+        echo "::warning::Failed to fetch JWT-SVID for audience: ${aud}"
+      fi
+      sleep 2
+    done
+    if [ -n "$JWT_TOKEN" ] && [ "$JWT_TOKEN" != ")" ]; then
+      # Escape audience for JSON key
+      ESCAPED_AUD=$(echo "$aud" | sed 's/"/\\"/g')
+      if [ "$JWT_JSON" = "{}" ]; then
+        JWT_JSON="{\"${ESCAPED_AUD}\":\"${JWT_TOKEN}\"}"
+      else
+        JWT_JSON="${JWT_JSON%\}},\"${ESCAPED_AUD}\":\"${JWT_TOKEN}\"}"
+      fi
+      echo "✓ JWT-SVID fetched for: ${aud}"
+    fi
+  done
+
+  echo "::endgroup::"
+fi
+
 # Stop agent
 kill $AGENT_PID 2>/dev/null || true
 
@@ -107,5 +147,6 @@ echo "spiffe-id=${SPIFFE_ID}" >> "$GITHUB_OUTPUT"
 echo "svid-cert=.spire-svid/svid.0.pem" >> "$GITHUB_OUTPUT"
 echo "svid-key=.spire-svid/svid.0.key" >> "$GITHUB_OUTPUT"
 echo "bundle=.spire-svid/bundle.0.pem" >> "$GITHUB_OUTPUT"
+echo "jwt-svids=${JWT_JSON}" >> "$GITHUB_OUTPUT"
 
 echo "Done - SVID files written to workspace/.spire-svid/"
