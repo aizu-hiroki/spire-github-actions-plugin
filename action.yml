@@ -30,11 +30,11 @@ outputs:
   spiffe-id:
     description: 'The SPIFFE ID assigned to the workload'
   svid-cert:
-    description: 'Relative path to the X.509 SVID certificate PEM file (prefix with ${{ github.workspace }}/)'
+    description: 'Relative path to the X.509 SVID certificate PEM file'
   svid-key:
-    description: 'Relative path to the X.509 SVID private key PEM file (prefix with ${{ github.workspace }}/)'
+    description: 'Relative path to the X.509 SVID private key PEM file'
   bundle:
-    description: 'Relative path to the trust bundle PEM file (prefix with ${{ github.workspace }}/)'
+    description: 'Relative path to the trust bundle PEM file'
   jwt-svids:
     description: 'JSON object mapping audience to JWT-SVID token (empty if jwt-audiences not set)'
 
