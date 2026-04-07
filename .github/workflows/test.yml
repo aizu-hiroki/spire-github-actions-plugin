@@ -186,6 +186,7 @@ jobs:
       # different SPIFFE IDs to jobs based on ref, workflow, etc.
 
       - name: Create node entry (branch-level alias)
+        if: github.event_name == 'push'
         run: |
           AGENT_ID="spiffe://example.org/spire/agent/github_actions/aizu-hiroki/spire-github-actions-plugin"
           spire-server entry create \
@@ -196,6 +197,7 @@ jobs:
           echo "✓ Node entry created for branch: ${GITHUB_REF_NAME}"
 
       - name: Create workload entry scoped to branch
+        if: github.event_name == 'push'
         run: |
           spire-server entry create \
             -spiffeID "spiffe://example.org/deploy/branch-scoped" \
@@ -204,6 +206,7 @@ jobs:
           echo "✓ Branch-scoped workload entry created"
 
       - name: Fetch branch-scoped workload SVID
+        if: github.event_name == 'push'
         run: |
           for i in $(seq 1 20); do
             if spire-agent api fetch x509 -socketPath /tmp/spire-agent.sock 2>/dev/null \
