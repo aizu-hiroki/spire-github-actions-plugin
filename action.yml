@@ -61,8 +61,9 @@ runs:
       shell: bash
       run: |
         ARCH=${{ runner.arch == 'ARM64' && 'arm64' || 'amd64' }}
+        VERSION=$(cat "$GITHUB_ACTION_PATH/VERSION")
         curl -sSfL \
-          "https://github.com/aizu-hiroki/spire-github-actions-plugin/releases/download/${GITHUB_ACTION_REF}/nodeattestor-agent-linux-${ARCH}" \
+          "https://github.com/aizu-hiroki/spire-github-actions-plugin/releases/download/${VERSION}/nodeattestor-agent-linux-${ARCH}" \
           -o /tmp/nodeattestor-agent
         chmod +x /tmp/nodeattestor-agent
 
