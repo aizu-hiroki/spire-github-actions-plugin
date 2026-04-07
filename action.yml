@@ -25,6 +25,10 @@ inputs:
     description: 'Comma-separated list of audiences for JWT-SVIDs (optional, skipped if empty)'
     required: false
     default: ''
+  plugin-version:
+    description: 'Version of the nodeattestor-agent binary to download from releases'
+    required: false
+    default: 'v0.6.0-beta4'
 
 outputs:
   spiffe-id:
@@ -61,9 +65,8 @@ runs:
       shell: bash
       run: |
         ARCH=${{ runner.arch == 'ARM64' && 'arm64' || 'amd64' }}
-        VERSION=$(cat "$GITHUB_ACTION_PATH/VERSION")
         curl -sSfL \
-          "https://github.com/aizu-hiroki/spire-github-actions-plugin/releases/download/${VERSION}/nodeattestor-agent-linux-${ARCH}" \
+          "https://github.com/aizu-hiroki/spire-github-actions-plugin/releases/download/${{ inputs.plugin-version }}/nodeattestor-agent-linux-${ARCH}" \
           -o /tmp/nodeattestor-agent
         chmod +x /tmp/nodeattestor-agent
 
@@ -77,4 +80,4 @@ runs:
         INPUT_AUDIENCE: ${{ inputs.audience }}
         INPUT_JWT_AUDIENCES: ${{ inputs.jwt-audiences }}
         NODEATTESTOR_AGENT_PATH: /tmp/nodeattestor-agent
-      run: ${{ github.action_path }}/entrypoint.sh
+      run: bash ${{ github.action_path }}/entrypoint.sh
