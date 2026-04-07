@@ -25,25 +25,59 @@ inputs:
     description: 'Comma-separated list of audiences for JWT-SVIDs (optional, skipped if empty)'
     required: false
     default: ''
+  plugin-version:
+    description: 'Version of the nodeattestor-agent binary to download from releases'
+    required: false
+    default: 'v0.6.0-beta4'
 
 outputs:
   spiffe-id:
     description: 'The SPIFFE ID assigned to the workload'
+    value: ${{ steps.attest.outputs.spiffe-id }}
   svid-cert:
     description: 'Relative path to the X.509 SVID certificate PEM file'
+    value: ${{ steps.attest.outputs.svid-cert }}
   svid-key:
     description: 'Relative path to the X.509 SVID private key PEM file'
+    value: ${{ steps.attest.outputs.svid-key }}
   bundle:
     description: 'Relative path to the trust bundle PEM file'
+    value: ${{ steps.attest.outputs.bundle }}
   jwt-svids:
     description: 'JSON object mapping audience to JWT-SVID token (empty if jwt-audiences not set)'
+    value: ${{ steps.attest.outputs.jwt-svids }}
 
 runs:
-  using: 'docker'
-  image: 'Dockerfile'
-  args:
-    - ${{ inputs.spire-server-address }}
-    - ${{ inputs.spire-server-port }}
-    - ${{ inputs.trust-domain }}
-    - ${{ inputs.audience }}
-    - ${{ inputs.jwt-audiences }}
+  using: 'composite'
+  steps:
+    - name: Download SPIRE agent
+      shell: bash
+      run: |
+        SPIRE_VERSION=1.9.6
+        ARCH=${{ runner.arch == 'ARM64' && 'arm64' || 'amd64' }}
+        curl -sSfL "https://github.com/spiffe/spire/releases/download/v${SPIRE_VERSION}/spire-${SPIRE_VERSION}-linux-${ARCH}-musl.tar.gz" \
+          -o /tmp/spire.tar.gz
+        tar xzf /tmp/spire.tar.gz -C /tmp/
+        echo "/tmp/spire-${SPIRE_VERSION}/bin" >> "$GITHUB_PATH"
+        rm /tmp/spire.tar.gz
+
+    - name: Download nodeattestor-agent
+      shell: bash
+      run: |
+        ARCH=${{ runner.arch == 'ARM64' && 'arm64' || 'amd64' }}
+        curl -sSfL \
+          "https://github.com/aizu-hiroki/spire-github-actions-plugin/releases/download/${{ inputs.plugin-version }}/nodeattestor-agent-linux-${ARCH}" \
+          -o /tmp/nodeattestor-agent
+        chmod +x /tmp/nodeattestor-agent
+
+    - name: Run SPIRE attestation
+      id: attest
+      shell: bash
+      env:
+        INPUT_SPIRE_SERVER_ADDRESS: ${{ inputs.spire-server-address }}
+        INPUT_SPIRE_SERVER_PORT: ${{ inputs.spire-server-port }}
+        INPUT_TRUST_DOMAIN: ${{ inputs.trust-domain }}
+        INPUT_AUDIENCE: ${{ inputs.audience }}
+        INPUT_JWT_AUDIENCES: ${{ inputs.jwt-audiences }}
+        NODEATTESTOR_AGENT_PATH: /tmp/nodeattestor-agent
+      run: bash ${{ github.action_path }}/entrypoint.sh

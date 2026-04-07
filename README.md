@@ -36,9 +36,9 @@ steps:
 
   - run: |
       # Use the SVID for mTLS
-      curl --cert "${{ steps.spire.outputs.svid-cert }}" \
-           --key  "${{ steps.spire.outputs.svid-key }}" \
-           --cacert "${{ steps.spire.outputs.bundle }}" \
+      curl --cert "${{ github.workspace }}/${{ steps.spire.outputs.svid-cert }}" \
+           --key  "${{ github.workspace }}/${{ steps.spire.outputs.svid-key }}" \
+           --cacert "${{ github.workspace }}/${{ steps.spire.outputs.bundle }}" \
            https://api.example.com/deploy
 ```
 
@@ -220,15 +220,17 @@ a process as UID 1001, will receive the `deploy/production` SVID.
 | `spire-server-port` | No | `8081` | SPIRE server port |
 | `trust-domain` | Yes | | SPIFFE trust domain |
 | `audience` | No | `spiffe://<trust-domain>` | Expected audience for OIDC token |
+| `jwt-audiences` | No | | Comma-separated list of audiences for JWT-SVIDs (skipped if empty) |
 
 ## Action Outputs
 
 | Output | Description |
 |--------|-------------|
 | `spiffe-id` | The SPIFFE ID assigned to the workload |
-| `svid-cert` | Path to the X.509 SVID certificate PEM file |
-| `svid-key` | Path to the X.509 SVID private key PEM file |
-| `bundle` | Path to the trust bundle PEM file |
+| `svid-cert` | Relative path to the X.509 SVID certificate PEM file (prepend `${{ github.workspace }}/`) |
+| `svid-key` | Relative path to the X.509 SVID private key PEM file (prepend `${{ github.workspace }}/`) |
+| `bundle` | Relative path to the trust bundle PEM file (prepend `${{ github.workspace }}/`) |
+| `jwt-svids` | JSON object mapping audience to JWT-SVID token (empty if `jwt-audiences` not set) |
 
 ## License
 

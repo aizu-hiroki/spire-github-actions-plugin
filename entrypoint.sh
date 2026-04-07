@@ -1,18 +1,18 @@
 #!/bin/bash
 set -euo pipefail
 
-SPIRE_SERVER_ADDRESS="$1"
-SPIRE_SERVER_PORT="$2"
-TRUST_DOMAIN="$3"
-AUDIENCE="${4:-spiffe://${TRUST_DOMAIN}}"
-JWT_AUDIENCES="${5:-}"
+SPIRE_SERVER_ADDRESS="$INPUT_SPIRE_SERVER_ADDRESS"
+SPIRE_SERVER_PORT="$INPUT_SPIRE_SERVER_PORT"
+TRUST_DOMAIN="$INPUT_TRUST_DOMAIN"
+AUDIENCE="${INPUT_AUDIENCE:-spiffe://${TRUST_DOMAIN}}"
+JWT_AUDIENCES="${INPUT_JWT_AUDIENCES:-}"
 
 # Use audience default if empty string was passed
 if [ -z "$AUDIENCE" ]; then
   AUDIENCE="spiffe://${TRUST_DOMAIN}"
 fi
 
-SVID_OUTPUT_DIR="/github/workspace/.spire-svid"
+SVID_OUTPUT_DIR="${GITHUB_WORKSPACE}/.spire-svid"
 SOCKET="/tmp/spire-agent/public/api.sock"
 
 echo "::group::Configure SPIRE agent"
@@ -29,7 +29,7 @@ agent {
 
 plugins {
   NodeAttestor "github_actions" {
-    plugin_cmd = "/usr/local/bin/nodeattestor-agent"
+    plugin_cmd = "${NODEATTESTOR_AGENT_PATH}"
     plugin_data {
       audience = "${AUDIENCE}"
     }
