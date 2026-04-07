@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-04-07
+
+### Changed
+- Converted Docker container action to composite action. The action now downloads
+  SPIRE agent and `nodeattestor-agent` binaries at runtime from GitHub Releases,
+  eliminating the need for a Docker daemon on the runner (e.g. ARC on Kubernetes).
+- SVID output paths now use `GITHUB_WORKSPACE` instead of the Docker-specific
+  `/github/workspace`. Outputs `svid-cert`, `svid-key`, and `bundle` are relative
+  paths; prepend `${{ github.workspace }}/` when using them.
+
+### Added
+- `plugin-version` input to control which `nodeattestor-agent` binary version is
+  downloaded from releases (default: current release).
+
+### Fixed
+- Branch-scoped node entry test now skipped on pull_request events where
+  `refs/pull/N/merge` refs do not produce a `branch:` selector.
+- Documented missing `jwt-audiences` input and `jwt-svids` output in README.
+
 ## [0.5.0] - 2026-03-26
 
 ### Added
