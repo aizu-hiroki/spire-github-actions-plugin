@@ -23,16 +23,19 @@ workflows to authenticate using GitHub's OIDC tokens for Node Attestation.
 
 ## Quick Start
 
+Replace `vX.Y.Z` with the [latest release](https://github.com/aizu-hiroki/spire-github-actions-plugin/releases/latest).
+
 ```yaml
 permissions:
   id-token: write
 
 steps:
-  - uses: aizu-hiroki/spire-github-actions-plugin@v1
+  - uses: aizu-hiroki/spire-github-actions-plugin@vX.Y.Z
     id: spire
     with:
       spire-server-address: "spire.example.com"
       trust-domain: "example.org"
+      plugin-version: "vX.Y.Z"  # same as the action tag
 
   - run: |
       # Use the SVID for mTLS
