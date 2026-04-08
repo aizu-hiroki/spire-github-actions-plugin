@@ -55,20 +55,24 @@ runs:
       run: |
         SPIRE_VERSION=1.9.6
         ARCH=${{ runner.arch == 'ARM64' && 'arm64' || 'amd64' }}
+        mkdir -p "${GITHUB_WORKSPACE}/.spire/bin"
         curl -sSfL "https://github.com/spiffe/spire/releases/download/v${SPIRE_VERSION}/spire-${SPIRE_VERSION}-linux-${ARCH}-musl.tar.gz" \
-          -o /tmp/spire.tar.gz
-        tar xzf /tmp/spire.tar.gz -C /tmp/
-        echo "/tmp/spire-${SPIRE_VERSION}/bin" >> "$GITHUB_PATH"
-        rm /tmp/spire.tar.gz
+          -o "${GITHUB_WORKSPACE}/.spire/spire.tar.gz"
+        tar xzf "${GITHUB_WORKSPACE}/.spire/spire.tar.gz" \
+          -C "${GITHUB_WORKSPACE}/.spire/bin/" \
+          --strip-components=2 \
+          "spire-${SPIRE_VERSION}/bin/spire-agent"
+        rm "${GITHUB_WORKSPACE}/.spire/spire.tar.gz"
 
     - name: Download nodeattestor-agent
       shell: bash
       run: |
         ARCH=${{ runner.arch == 'ARM64' && 'arm64' || 'amd64' }}
+        mkdir -p "${GITHUB_WORKSPACE}/.spire/bin"
         curl -sSfL \
           "https://github.com/aizu-hiroki/spire-github-actions-plugin/releases/download/${{ inputs.plugin-version }}/nodeattestor-agent-linux-${ARCH}" \
-          -o /tmp/nodeattestor-agent
-        chmod +x /tmp/nodeattestor-agent
+          -o "${GITHUB_WORKSPACE}/.spire/bin/nodeattestor-agent"
+        chmod +x "${GITHUB_WORKSPACE}/.spire/bin/nodeattestor-agent"
 
     - name: Run SPIRE attestation
       id: attest
@@ -79,5 +83,6 @@ runs:
         INPUT_TRUST_DOMAIN: ${{ inputs.trust-domain }}
         INPUT_AUDIENCE: ${{ inputs.audience }}
         INPUT_JWT_AUDIENCES: ${{ inputs.jwt-audiences }}
-        NODEATTESTOR_AGENT_PATH: /tmp/nodeattestor-agent
+        NODEATTESTOR_AGENT_PATH: ${{ github.workspace }}/.spire/bin/nodeattestor-agent
+        SPIRE_AGENT_PATH: ${{ github.workspace }}/.spire/bin/spire-agent
       run: bash ${{ github.action_path }}/entrypoint.sh

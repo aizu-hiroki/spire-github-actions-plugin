@@ -13,16 +13,19 @@ if [ -z "$AUDIENCE" ]; then
 fi
 
 SVID_OUTPUT_DIR="${GITHUB_WORKSPACE}/.spire-svid"
-SOCKET="/tmp/spire-agent/public/api.sock"
+SPIRE_DIR="${GITHUB_WORKSPACE}/.spire"
+SOCKET="${SPIRE_DIR}/agent/public/api.sock"
 
 echo "::group::Configure SPIRE agent"
 
-cat > /tmp/agent.conf <<EOF
+mkdir -p "${SPIRE_DIR}/data"
+
+cat > "${SPIRE_DIR}/agent.conf" <<EOF
 agent {
   server_address = "${SPIRE_SERVER_ADDRESS}"
   server_port    = "${SPIRE_SERVER_PORT}"
   trust_domain   = "${TRUST_DOMAIN}"
-  data_dir       = "/tmp/spire-agent-data"
+  data_dir       = "${SPIRE_DIR}/data"
   log_level      = "INFO"
   insecure_bootstrap = true
 }
@@ -45,19 +48,18 @@ plugins {
 }
 EOF
 
-mkdir -p /tmp/spire-agent-data
 echo "Agent config:"
-cat /tmp/agent.conf
+cat "${SPIRE_DIR}/agent.conf"
 echo "::endgroup::"
 
 echo "::group::Start SPIRE agent and attest"
 
-spire-agent run -config /tmp/agent.conf &
+"${SPIRE_AGENT_PATH}" run -config "${SPIRE_DIR}/agent.conf" &
 AGENT_PID=$!
 
 # Wait for node attestation
 for i in $(seq 1 30); do
-  if spire-agent healthcheck -socketPath "$SOCKET" 2>/dev/null; then
+  if "${SPIRE_AGENT_PATH}" healthcheck -socketPath "$SOCKET" 2>/dev/null; then
     echo "Node attestation successful"
     break
   fi
@@ -76,7 +78,7 @@ echo "::group::Fetch X.509 SVID"
 mkdir -p "$SVID_OUTPUT_DIR"
 
 for i in $(seq 1 20); do
-  if spire-agent api fetch x509 -socketPath "$SOCKET" -write "$SVID_OUTPUT_DIR" 2>/dev/null; then
+  if "${SPIRE_AGENT_PATH}" api fetch x509 -socketPath "$SOCKET" -write "$SVID_OUTPUT_DIR" 2>/dev/null; then
     echo "SVID written to $SVID_OUTPUT_DIR"
     break
   fi
@@ -89,11 +91,11 @@ for i in $(seq 1 20); do
 done
 
 # Get SPIFFE ID
-SPIFFE_ID=$(spire-agent api fetch x509 -socketPath "$SOCKET" 2>/dev/null | grep "SPIFFE ID" | head -1 | awk '{print $NF}')
+SPIFFE_ID=$("${SPIRE_AGENT_PATH}" api fetch x509 -socketPath "$SOCKET" 2>/dev/null | grep "SPIFFE ID" | head -1 | awk '{print $NF}')
 echo "SPIFFE ID: ${SPIFFE_ID}"
 
 # Display SVID details
-spire-agent api fetch x509 -socketPath "$SOCKET"
+"${SPIRE_AGENT_PATH}" api fetch x509 -socketPath "$SOCKET"
 
 echo "::endgroup::"
 
@@ -111,7 +113,7 @@ if [ -n "$JWT_AUDIENCES" ]; then
     echo "Fetching JWT-SVID for audience: ${aud}"
     JWT_TOKEN=""
     for i in $(seq 1 10); do
-      JWT_OUTPUT=$(spire-agent api fetch jwt -audience "$aud" -socketPath "$SOCKET" 2>/dev/null || true)
+      JWT_OUTPUT=$("${SPIRE_AGENT_PATH}" api fetch jwt -audience "$aud" -socketPath "$SOCKET" 2>/dev/null || true)
       JWT_TOKEN=$(echo "$JWT_OUTPUT" | grep -A1 "token(" | tail -1 | xargs || true)
       if [ -n "$JWT_TOKEN" ] && [ "$JWT_TOKEN" != ")" ]; then
         break
@@ -140,9 +142,6 @@ fi
 kill $AGENT_PID 2>/dev/null || true
 
 # Set outputs
-# Inside Docker container, workspace is /github/workspace
-# On the host, it's $GITHUB_WORKSPACE (different path)
-# Output relative paths so users can prepend ${{ github.workspace }}
 echo "spiffe-id=${SPIFFE_ID}" >> "$GITHUB_OUTPUT"
 echo "svid-cert=.spire-svid/svid.0.pem" >> "$GITHUB_OUTPUT"
 echo "svid-key=.spire-svid/svid.0.key" >> "$GITHUB_OUTPUT"
