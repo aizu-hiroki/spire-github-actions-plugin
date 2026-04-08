@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2026-04-08
+
+### Changed
+- All SPIRE agent binaries, configuration, and socket are now placed under
+  `$GITHUB_WORKSPACE/.spire/` instead of `/tmp`. This ensures compatibility
+  with self-hosted Kubernetes runners (ARC) where `/tmp` may be mounted with
+  `noexec`.
+
 ## [0.6.0] - 2026-04-07
 
 ### Changed
