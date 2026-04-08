@@ -224,6 +224,7 @@ a process as UID 1001, will receive the `deploy/production` SVID.
 | `trust-domain` | Yes | | SPIFFE trust domain |
 | `audience` | No | `spiffe://<trust-domain>` | Expected audience for OIDC token |
 | `jwt-audiences` | No | | Comma-separated list of audiences for JWT-SVIDs (skipped if empty) |
+| `plugin-version` | No | `v0.7.0` | Version of the `nodeattestor-agent` binary to download from releases |
 
 ## Action Outputs
 
