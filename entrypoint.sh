@@ -26,6 +26,7 @@ agent {
   server_port    = "${SPIRE_SERVER_PORT}"
   trust_domain   = "${TRUST_DOMAIN}"
   data_dir       = "${SPIRE_DIR}/data"
+  socket_path    = "${SOCKET}"
   log_level      = "INFO"
   insecure_bootstrap = true
 }
