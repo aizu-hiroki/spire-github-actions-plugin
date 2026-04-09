@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2026-04-09
+
+### Fixed
+- Add `socket_path` to the SPIRE agent configuration so the agent creates its
+  Unix socket at `$GITHUB_WORKSPACE/.spire/agent/public/api.sock`, matching
+  the path used by the action. Previously the agent defaulted to
+  `/tmp/spire-agent/public/api.sock`, causing a mismatch on ARC runners.
+
 ## [0.7.0] - 2026-04-08
 
 ### Changed

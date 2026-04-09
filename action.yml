@@ -28,7 +28,7 @@ inputs:
   plugin-version:
     description: 'Version of the nodeattestor-agent binary to download from releases'
     required: false
-    default: 'v0.7.0'
+    default: 'v0.8.0'
 
 outputs:
   spiffe-id:
